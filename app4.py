@@ -1428,20 +1428,22 @@ with tab_hub:
         "Interactive Visual Photo Cards of Iconic Lyon Landmarks",
     )
 
-    # UI EDITING: 3-column grid of iconic Lyon landmark visual photo cards
+  # UI EDITING: 3-column grid of iconic Lyon landmark visual photo cards
     card_cols = st.columns(3)
     for idx, landmark in enumerate(LYON_LANDMARK_CARDS):
         with card_cols[idx % 3]:
             with st.container(border=True):
                 st.caption(f"📍 {landmark['district']}  •  {landmark['tag']}")
-                try:
-                    st.image(landmark["image_url"], use_container_width=True)
-                except Exception:
-                    st.markdown(f"🏛️ **{landmark['name_fr']}**")
+                img_bytes = load_landmark_image(
+                    landmark["commons_file"],
+                    landmark["name_fr"],
+                    landmark["district"],
+                    landmark["palette"],
+                )
+                st.image(img_bytes, use_container_width=True)
                 st.markdown(f"**{landmark['name_fr']}**")
                 st.caption(f"*{landmark['name_en']}*")
                 st.write(landmark["caption"])
-
 
 # ==============================================================================
 # TAB 2: 12 LYON RIDDLES & 3 REAL-LIFE PHOTO QUESTS
