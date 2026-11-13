@@ -124,13 +124,19 @@ LYON_GUIDE_SECTIONS = [
 ]
 
 # UI EDITING: Interactive visual landmark cards with high-resolution imagery and fallback styling
+import urllib.parse
+import urllib.request
+from PIL import ImageDraw
+
+# UI EDITING: Verified Wikimedia Commons filenames for iconic Lyon landmarks
 LYON_LANDMARK_CARDS = [
     {
         "name_fr": "Basilique Notre-Dame de Fourvière",
         "name_en": "Basilica of Notre-Dame de Fourvière",
         "district": "Fourvière (5e)",
         "tag": "PANORAMA & SACRED ART",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Basilique_Notre-Dame_de_Fourvi%C3%A8re_Lyon.jpg/800px-Basilique_Notre-Dame_de_Fourvi%C3%A8re_Lyon.jpg",
+        "commons_file": "Basilique Notre Dame de Fourvière (Lyon).jpg",
+        "palette": ("#4A0E1C", "#B8860B"),
         "caption": "Built 1872–1884 by Pierre Bossan, blending Romano-Byzantine mosaics with panoramic views over Lyon.",
     },
     {
@@ -138,7 +144,8 @@ LYON_LANDMARK_CARDS = [
         "name_en": "Old Lyon & Renaissance Passages",
         "district": "Saint-Jean (5e)",
         "tag": "UNESCO RENAISSANCE",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Lyon_5e_-_Rue_Saint-Jean_et_Cath%C3%A9drale.jpg/800px-Lyon_5e_-_Rue_Saint-Jean_et_Cath%C3%A9drale.jpg",
+        "commons_file": "Rue St-Jean, Lyon, France.JPG",
+        "palette": ("#6B2D1A", "#D4A373"),
         "caption": "Cobblestone alleys, Gothic Saint-Jean Cathedral, and vaulted secret passageways.",
     },
     {
@@ -146,7 +153,8 @@ LYON_LANDMARK_CARDS = [
         "name_en": "Bellecour Square & The Peninsula",
         "district": "Bellecour (2e)",
         "tag": "HEART OF LYON",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Place_Bellecour_Lyon.jpg/800px-Place_Bellecour_Lyon.jpg",
+        "commons_file": "Place Bellecour Lyon (1).JPG",
+        "palette": ("#7A1C32", "#E07A5F"),
         "caption": "Europe's largest pedestrian square, featuring red crushed-brick gravel and King Louis XIV on horseback.",
     },
     {
@@ -154,7 +162,8 @@ LYON_LANDMARK_CARDS = [
         "name_en": "Park of the Golden Head",
         "district": "Tête d'Or (6e)",
         "tag": "117-HECTARE URBAN OASIS",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Parc_de_la_T%C3%AAte_d%27Or_-_Lac.jpg/800px-Parc_de_la_T%C3%AAte_d%27Or_-_Lac.jpg",
+        "commons_file": "General view - Parc de la Tête d'Or - DSC05262.jpg",
+        "palette": ("#1B4332", "#52B788"),
         "caption": "France's largest urban park featuring a 16-hectare boating lake, botanical greenhouses, and rose gardens.",
     },
     {
@@ -162,7 +171,8 @@ LYON_LANDMARK_CARDS = [
         "name_en": "Confluences Science & Anthropology Museum",
         "district": "La Confluence (2e)",
         "tag": "RHÔNE MEETS SAÔNE",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Mus%C3%A9e_des_Confluences_Lyon.jpg/800px-Mus%C3%A9e_des_Confluences_Lyon.jpg",
+        "commons_file": "Lyon - Musée des Confluences (49525806051).jpg",
+        "palette": ("#0D3B66", "#4EA8DE"),
         "caption": "Coop Himmelb(l)au's glass-and-steel 'Crystal Cloud' poised where the Rhône and Saône unite.",
     },
     {
@@ -170,10 +180,52 @@ LYON_LANDMARK_CARDS = [
         "name_en": "Ancient Roman Theatres of Fourvière",
         "district": "Fourvière (5e)",
         "tag": "15 BC LUGDUNUM",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Th%C3%A9%C3%A2tre_antique_de_Lyon.jpg/800px-Th%C3%A9%C3%A2tre_antique_de_Lyon.jpg",
+        "commons_file": "Lyon 5 - Théâtre antique de Fourvière 01.jpg",
+        "palette": ("#5C3A21", "#C89B3C"),
         "caption": "The oldest Roman theatre in Gaul, seating 10,000 spectators and still hosting summer concerts.",
     },
 ]
+
+
+# LOGIC: Fetch verified Wikimedia photo with compliant User-Agent, or render a bespoke Pillow postcard fallback
+@st.cache_data(show_spinner=False, ttl=86400)
+def load_landmark_image(commons_file: str, title_fr: str, district: str, palette: tuple[str, str]) -> bytes:
+    encoded_name = urllib.parse.quote(commons_file.replace(" ", "_"))
+    url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{encoded_name}?width=800"
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "ExplorerQuestLyon/1.0 (https://github.com/explorer-quest-lyon; educational-app)"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            raw_bytes = resp.read()
+        with PILImage.open(io.BytesIO(raw_bytes)) as im:
+            im = im.convert("RGB")
+            im.thumbnail((800, 520))
+            out = io.BytesIO()
+            im.save(out, format="JPEG", quality=85)
+            return out.getvalue()
+    except Exception:
+        # LOGIC: Generate clean offline architectural postcard graphic if network/hotlink fails
+        w, h = 800, 480
+        c1, c2 = palette
+        img = PILImage.new("RGB", (w, h), c1)
+        draw = ImageDraw.Draw(img)
+        for y in range(h):
+            ratio = y / float(h)
+            r1, g1, b1 = tuple(int(c1.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+            r2, g2, b2 = tuple(int(c2.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+            r = int(r1 + (r2 - r1) * ratio)
+            g = int(g1 + (g2 - g1) * ratio)
+            b = int(b1 + (b2 - b1) * ratio)
+            draw.line([(0, y), (w, y)], fill=(r, g, b))
+        draw.rectangle([24, 24, w - 24, h - 24], outline="#FFF8EE", width=3)
+        draw.text((48, 175), f"LYON • {district.upper()}", fill="#FCE8B2")
+        draw.text((48, 215), title_fr, fill="#FFFFFF")
+        draw.text((48, 260), "CARTE POSTALE OFFICIELLE • EXPLORER QUEST", fill="#FFF8EE")
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=90)
+        return out.getvalue()
 
 # LOGIC: Hardcoded list of 12 curated Lyon riddles & trivia challenges (50 points each)
 LYON_RIDDLES = [
